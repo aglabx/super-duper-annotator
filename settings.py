@@ -57,5 +57,11 @@ tools_settings = {
         "makeblastdb_amr_input": settings["blastp_amr"],
         "makeblastdb_sprot_input": settings["blastp_sprot"],
         "makeblastdb_options": "-hash_index -dbtype prot -in",    
+    },
+     "signalp_options": {
+        "signalp_binary": os.path.join(settings["binary_folder"], "signalp"),
+        "signalp_input": settings["input_file"],
+        "signalp_output": os.path.join(settings["output_folder"], "signalp.out"),
+        "signalp_options": "-tmp ./result -prefix ./result/signalp -org gram+ -format short -fasta" % settings,
     }
 }
