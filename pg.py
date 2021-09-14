@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 import re
 
 from Bio import SeqIO
@@ -19,6 +18,7 @@ from subprocess import Popen
 from collections import namedtuple
 
 from cache import Cache
+from tools import check_all_tools
 from utilities import IOWrapper
 from utilities import ToolExecutionError
 
@@ -92,8 +92,7 @@ def prepare_input(seq_iterator):
         yield contig
 
     if ncontig <= 0:
-        raise ValueError(
-            f'FASTA file {input} contains no suitable sequence entries')
+        raise ValueError(f'FASTA file {input} contains no suitable sequence entries')
     print(f'Total {total_bp} BP read')
 
     CONTEXT.TOTAL_BP = total_bp
@@ -115,7 +114,13 @@ def first(input):
 
 
 def _run_tool(tool_name, cmd, env=None):
-    with Popen(cmd.split(), text='utf-8', stdout=PIPE, stderr=PIPE, env=env) as process:
+    popen_args = {
+        'stdout': PIPE,
+        'stderr': PIPE,
+        'text': 'utf-8',
+        'env': env
+    }
+    with Popen(cmd.split(), text='utf-8', **popen_args) as process:
         for line in process.stdout:
             yield line
 
@@ -189,7 +194,7 @@ def t_rna(input):
             print(f'tRNA {record.pos} is too big (>{MAX_TRNA_LEN}) - skipping.')
             continue
 
-        tool = 'Aragorgn'  # todo: + tool.aragorn.version
+        tool = 'Aragorgn:' + CONTEXT.TOOLS['aragorn'].version
 
         ftype = 'tRNA'
         product = record.name + record.codon
@@ -245,7 +250,7 @@ def nc_rna(input):
     icpu = CONTEXT.CPU | 1
     dbsize = CONTEXT.TOTAL_BP * 2 / 10e6
     cmdb = f'./prokka/db/cm/{CONTEXT.KINGDOM}'
-    tool = f"Infernal"  # todo: add version
+    tool = f"infernal:" + CONTEXT.TOOLS['cmscan'].version
 
     cmd = f"cmscan -Z {dbsize} --cut_ga --rfam --nohmmonly --fmt 2 --cpu {icpu}" + \
           f" --tblout /dev/stdout -o /dev/null --noali {cmdb} {input}"
@@ -296,6 +301,8 @@ def nc_rna(input):
 
 
 def main():
+    CONTEXT.TOOLS = {t.name:t for t in check_all_tools()}
+
     out = first(argv[1])
     trna_features = t_rna(out)
     CONTEXT.add_features(trna_features)
