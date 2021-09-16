@@ -51,7 +51,7 @@ class Context:
                 self.CONTIG[cid].features += fs
 
 
-CONTEXT = Context()
+context = Context()
 
 
 def prepare_input(seq_iterator):
@@ -88,14 +88,14 @@ def prepare_input(seq_iterator):
         contig.description = ''
         total_bp += len(contig.seq)
 
-        CONTEXT.CONTIG[contig.id] = contig
+        context.CONTIG[contig.id] = contig
         yield contig
 
     if ncontig <= 0:
         raise ValueError(f'FASTA file {input} contains no suitable sequence entries')
     print(f'Total {total_bp} BP read')
 
-    CONTEXT.TOTAL_BP = total_bp
+    context.TOTAL_BP = total_bp
 
 
 def first(input):
@@ -120,7 +120,7 @@ def _run_tool(tool_name, cmd, env=None):
         'text': 'utf-8',
         'env': env
     }
-    with Popen(cmd.split(), text='utf-8', **popen_args) as process:
+    with Popen(cmd.split(), **popen_args) as process:
         for line in process.stdout:
             yield line
 
@@ -188,13 +188,13 @@ def t_rna(input):
             continue
 
         start = max(start, 1)
-        min(end, len(CONTEXT.CONTIG[contig_id].seq))
+        min(end, len(context.CONTIG[contig_id].seq))
 
         if abs(end-start) > MAX_TRNA_LEN:
             print(f'tRNA {record.pos} is too big (>{MAX_TRNA_LEN}) - skipping.')
             continue
 
-        tool = 'Aragorgn:' + CONTEXT.TOOLS['aragorn'].version
+        tool = 'Aragorgn:' + context.TOOLS['aragorn'].version
 
         ftype = 'tRNA'
         product = record.name + record.codon
@@ -247,10 +247,10 @@ def nc_rna(input):
     if not exists(input):
         raise FileExistsError(input)
 
-    icpu = CONTEXT.CPU | 1
-    dbsize = CONTEXT.TOTAL_BP * 2 / 10e6
-    cmdb = f'./prokka/db/cm/{CONTEXT.KINGDOM}'
-    tool = f"infernal:" + CONTEXT.TOOLS['cmscan'].version
+    icpu = context.CPU | 1
+    dbsize = context.TOTAL_BP * 2 / 10e6
+    cmdb = f'./prokka/db/cm/{context.KINGDOM}'
+    tool = f"infernal:" + context.TOOLS['cmscan'].version
 
     cmd = f"cmscan -Z {dbsize} --cut_ga --rfam --nohmmonly --fmt 2 --cpu {icpu}" + \
           f" --tblout /dev/stdout -o /dev/null --noali {cmdb} {input}"
@@ -265,7 +265,7 @@ def nc_rna(input):
             continue
 
         contig_id = data[3]
-        if not contig_id in CONTEXT.CONTIG:
+        if not contig_id in context.CONTIG:
             continue
 
         # Overlaps with a higher scoring match
@@ -301,17 +301,25 @@ def nc_rna(input):
 
 
 def main():
-    CONTEXT.TOOLS = {t.name:t for t in check_all_tools()}
+    context.TOOLS = {t.name:t for t in check_all_tools()}
 
     out = first(argv[1])
+
+
     trna_features = t_rna(out)
-    CONTEXT.add_features(trna_features)
+    context.add_features(trna_features)
 
     rrna_features = r_rna(out)
-    CONTEXT.add_features(rrna_features)
+    context.add_features(rrna_features)
 
     ncrna_features = nc_rna(out)
-    CONTEXT.add_features(ncrna_features)
+    context.add_features(ncrna_features)
+
+
+    for v in context.CONTIG.values():
+        print(v)
+        for f in v.features:
+            print(f)
 
     print(f"Total {deeplen(trna_features) + deeplen(rrna_features)} tRNA + rRNA features")
     print('we\'re done for now, come back later')
