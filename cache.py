@@ -5,7 +5,11 @@ from os.path import join
 from os.path import exists
 from json import dump
 from json import load
+from logging import getLogger
 from contextlib import contextmanager
+
+
+log = getLogger('sudan.cache')
 
 
 class CacheState:
@@ -17,7 +21,6 @@ class Cache:
     METAFILE_NAME = ".cache_meta"
 
     def __init__(self, folder):
-        self.enabled = True
         self.folder = folder
         self.meta_file = join(self.folder, Cache.METAFILE_NAME)
 
@@ -27,6 +30,8 @@ class Cache:
         if not exists(self.meta_file):
             with open(self.meta_file, 'w') as ch:
                 dump({'ver': 1}, ch)
+
+        log.info(f'cache initialized {self.folder}')
 
         m = self.meta
         for file in listdir(self.folder):
@@ -56,8 +61,6 @@ class Cache:
 
     @contextmanager
     def register(self, name):
-        if not self.enabled:
-            raise
         self._set_prop(name, CacheState.INCOMPLETE)
         with open(join(self.folder, name), mode='w', encoding='utf-8') as fh:
             yield fh
@@ -66,12 +69,9 @@ class Cache:
         self._set_prop(name, CacheState.COMPLETE)
 
     def cachelines(self, name, iterable):
-        if not self.enabled:
-            yield from iterable
-
         meta = self.meta
         if name in meta and meta[name] == CacheState.COMPLETE:
-            print("CACHE HIT!")
+            log.info(f"cache hit {name}")
             with open(join(self.folder, name)) as f:
                 yield from f
             return
